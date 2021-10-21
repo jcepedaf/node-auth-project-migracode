@@ -3,7 +3,7 @@ const bcrypt = require("bcrypt");   // bcrypt is used to hash password before sa
 const fs = require("fs");   // fs is node's inbuilt file system module used to manage files
 
 const usersDb = require("../database/db.json");   // import existing data from db.json file
-
+const authenticate = require("../middleware/authenticate");
 const generateJWT = require("../utils/generateJWT");
 const router = express.Router();   // we create a new router using express's inbuilt Router method
 
@@ -51,6 +51,53 @@ router.post("/sign-up", async (req, res) => {
   } catch (error) {
     console.error(error.message);
     res.status(500).send({error: error.message});
+  }
+});
+
+
+// user sign-in / login
+router.post("/sign-in", async (req, res) => {
+  const { email, password } = req.body;
+
+  try {
+    const user = await usersDb.filter(user => user.email === email);
+
+    if (user.length === 0) {
+      return res.status(401).json({error: "Invalid Credential", isAuthenticated: false});
+    }
+
+
+    // if the user exist then we will compare the password provided by user with the hashed password we stored during user registration
+    const isValidPassword = await bcrypt.compare(
+      password,
+      user[0].password
+    );
+
+    if (!isValidPassword) {
+      return res.status(401).json({error: "Invalid Credential", isAuthenticated: false});
+    }
+
+    
+    // if the password matches with hashed password then we generate a new token and send it back to user
+    const jwtToken = generateJWT(user[0].id);
+
+    return res.status(200).send({ jwtToken, isAuthenticated: true });
+
+  } catch (error) {
+    console.error(error.message);
+    res.status(500).send({error: error.message});
+  }
+});
+
+// user authorization
+router.post("/auth", authenticate, (req, res) => {
+  try {
+    
+    res.status(200).send({isAuthenticated: true});
+
+  } catch (error) {
+    console.error(error.message);
+    res.status(500).send({error: error.message, isAuthenticated: false});
   }
 });
 
